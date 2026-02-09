@@ -1,20 +1,18 @@
-### Cập nhật kết nối google anti gravity
-##Bổ sung thêm skills cho openclaw
 services:
   openclaw-gateway:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
     image: openclaw:local
     container_name: openclaw-gateway
     restart: unless-stopped
     expose:
       - "18789"
     ports:
-      - "51121:51121"  # OAuth callback port
+      - "18789:18789"
     volumes:
-      - ./config:/root/.openclaw
-      - openclaw-workspace:/root/.openclaw/workspace
+      - ./config:/home/openclaw/.openclaw
+      - ./data/workspace:/home/openclaw/.openclaw/workspace
       - ./skills:/app/skills-user:rw
     env_file: .env
     environment:
@@ -40,6 +38,7 @@ services:
         done;
         echo "=== All skills ===";
         ls -la /app/skills/;
+        cd /app && node dist/index.js doctor --fix;
         exec node /app/dist/index.js gateway --bind lan --allow-unconfigured
     networks:
       - traefik-net
@@ -55,16 +54,14 @@ services:
   openclaw-cli:
     image: openclaw:local
     container_name: openclaw-cli
-    ports:
-      - "51121:51121"  # OAuth callback port for CLI auth
     volumes:
-      - ./config:/root/.openclaw
-      - openclaw-workspace:/root/.openclaw/workspace
+      - ./config:/home/openclaw/.openclaw
+      - ./data/workspace:/home/openclaw/.openclaw/workspace
       - ./skills:/app/skills-user:rw
     env_file: .env
     environment:
       - NODE_ENV=production
-    entrypoint: ["node", "dist/index.js"]
+    entrypoint: ["node", "/app/dist/index.js"]
     networks:
       - traefik-net
     profiles:
@@ -75,6 +72,3 @@ services:
 networks:
   traefik-net:
     external: true
-
-volumes:
-  openclaw-workspace:
