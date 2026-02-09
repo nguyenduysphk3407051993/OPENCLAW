@@ -1,0 +1,53 @@
+services:
+  openclaw-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openclaw:local
+    container_name: openclaw-gateway
+    restart: unless-stopped
+    expose:
+      - "18789"
+    volumes:
+      - ./config:/root/.openclaw
+      - openclaw-workspace:/root/.openclaw/workspace
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - OPENCLAW_GATEWAY_BIND=0.0.0.0
+      - OPENCLAW_GATEWAY_TRUSTED_PROXIES=0.0.0.0/0
+    command: ["node", "dist/index.js", "gateway", "--bind", "lan", "--allow-unconfigured"]
+    networks:
+      - traefik-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openclaw.rule=Host(`openclaw.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.openclaw.entrypoints=websecure"
+      - "traefik.http.routers.openclaw.tls.certresolver=letsencrypt"
+      - "traefik.http.services.openclaw.loadbalancer.server.port=18789"
+      - "traefik.http.middlewares.openclaw-headers.headers.customrequestheaders.X-Forwarded-For="
+      - "traefik.http.routers.openclaw.middlewares=openclaw-headers"
+
+  openclaw-cli:
+    image: openclaw:local
+    container_name: openclaw-cli
+    volumes:
+      - ./config:/root/.openclaw
+      - openclaw-workspace:/root/.openclaw/workspace
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+    entrypoint: ["node", "dist/index.js"]
+    networks:
+      - traefik-net
+    profiles:
+      - cli
+    stdin_open: true
+    tty: true
+
+networks:
+  traefik-net:
+    external: true
+
+volumes:
+  openclaw-workspace:

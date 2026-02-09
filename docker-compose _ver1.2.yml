@@ -1,0 +1,75 @@
+##Bổ sung thêm skills cho openclaw
+services:
+  openclaw-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openclaw:local
+    container_name: openclaw-gateway
+    restart: unless-stopped
+    expose:
+      - "18789"
+    volumes:
+      - ./config:/root/.openclaw
+      - openclaw-workspace:/root/.openclaw/workspace
+      - ./skills:/app/skills-user:rw
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - OPENCLAW_GATEWAY_BIND=0.0.0.0
+      - OPENCLAW_GATEWAY_TRUSTED_PROXIES=0.0.0.0/0
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        echo "=== Cleaning dead symlinks ===";
+        find /app/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete;
+        echo "=== Linking user skills ===";
+        for d in /app/skills-user/*/; do
+          skill_name=$$(basename "$$d");
+          target="/app/skills/$$skill_name";
+          if [ ! -e "$$target" ]; then
+            ln -sfn "$$d" "$$target";
+            echo "  Linked: $$skill_name";
+          else
+            echo "  Skipped (exists): $$skill_name";
+          fi;
+        done;
+        echo "=== All skills ===";
+        ls -la /app/skills/;
+        exec node dist/index.js gateway --bind lan --allow-unconfigured
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openclaw.rule=Host(`molbot.${DOMAIN_NAME}`)"
+      - "traefik.http.routers.openclaw.entrypoints=websecure"
+      - "traefik.http.routers.openclaw.tls.certresolver=letsencrypt"
+      - "traefik.http.services.openclaw.loadbalancer.server.port=18789"
+      - "traefik.http.middlewares.openclaw-headers.headers.customrequestheaders.X-Forwarded-For="
+      - "traefik.http.routers.openclaw.middlewares=openclaw-headers"
+
+  openclaw-cli:
+    image: openclaw:local
+    container_name: openclaw-cli
+    volumes:
+      - ./config:/root/.openclaw
+      - openclaw-workspace:/root/.openclaw/workspace
+      - ./skills:/app/skills-user:rw
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+    entrypoint: ["node", "dist/index.js"]
+    networks:
+      - traefik-network
+    profiles:
+      - cli
+    stdin_open: true
+    tty: true
+
+networks:
+  traefik-network:
+    external: true
+
+volumes:
+  openclaw-workspace:
