@@ -40,7 +40,7 @@ services:
         done;
         echo "=== All skills ===";
         ls -la /app/skills/;
-        exec node dist/index.js gateway --bind lan --allow-unconfigured
+        exec node /app/dist/index.js gateway --bind lan --allow-unconfigured
     networks:
       - traefik-net
     labels:
