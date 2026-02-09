@@ -42,10 +42,9 @@
       "token": "c95e046c2e849446da864f322fb9ef97bd6202181769da96dc39332bcacbd216"
     },
     "trustedProxies": [
-      "172.18.0.0/16",
-      "172.17.0.0/16"
+      "0.0.0.0/0"
     ],
-    "mode": "local",
+    "mode": "remote",
     "port": 18789,
     "bind": "lan",
     "tailscale": {
