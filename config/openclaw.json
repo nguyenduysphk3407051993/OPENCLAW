@@ -39,7 +39,7 @@
     "auth": {
       "allowTailscale": false,
       "mode": "token",
-      "token": "08c2ff08c33ab626f41b6a426baa9f4a4ef696d05441694d"
+      "token": "c95e046c2e849446da864f322fb9ef97bd6202181769da96dc39332bcacbd216"
     },
     "trustedProxies": [
       "172.18.0.0/16",
