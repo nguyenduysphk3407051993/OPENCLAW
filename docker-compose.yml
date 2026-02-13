@@ -1,9 +1,10 @@
 services:
   openclaw-gateway:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    image: openclaw:local
+    #build:
+    #  context: .
+    #  dockerfile: docker/Dockerfile
+    #image: openclaw:local
+    image: openclaw-texlive
     container_name: openclaw-gateway
     restart: unless-stopped
     expose:
@@ -11,20 +12,25 @@ services:
     ports:
       - "18789:18789"
     volumes:
+      # Duy lưu ý: Đảm bảo thư mục ./config trên VPS có quyền chmod 700
       - ./config:/home/openclaw/.openclaw
       - ./data/workspace:/home/openclaw/.openclaw/workspace
       - ./skills:/app/skills-user:rw
     env_file: .env
     environment:
       - NODE_ENV=production
-      - OPENCLAW_GATEWAY_BIND=0.0.0.0
-      - OPENCLAW_GATEWAY_TRUSTED_PROXIES=0.0.0.0/0
+      - GATEWAY_MODE=remote
+      - GATEWAY_BIND=0.0.0.0
+      - GATEWAY_TRUSTED_PROXIES=172.18.0.0/16,127.0.0.1
+      # Thêm biến này để OpenClaw biết thư mục nhà chính xác
+      - OPENCLAW_STATE_DIR=/home/openclaw/.openclaw
     command:
       - /bin/sh
       - -lc
       - |
-        echo "=== Cleaning dead symlinks ===";
-        find /app/skills -maxdepth 1 -type l ! -exec test -e {} \; -delete;
+        echo "=== Preparing directories ===";
+        mkdir -p /home/openclaw/.openclaw/agents/main/sessions;
+        mkdir -p /home/openclaw/.openclaw/credentials;
         echo "=== Linking user skills ===";
         for d in /app/skills-user/*/; do
           skill_name=$$(basename "$$d");
@@ -32,27 +38,25 @@ services:
           if [ ! -e "$$target" ]; then
             ln -sfn "$$d" "$$target";
             echo "  Linked: $$skill_name";
-          else
-            echo "  Skipped (exists): $$skill_name";
           fi;
         done;
-        echo "=== All skills ===";
-        ls -la /app/skills/;
-        cd /app && node dist/index.js doctor --fix;
-        exec node /app/dist/index.js gateway --bind lan --allow-unconfigured
+        # Chạy doctor để tự sửa lỗi cấu hình trước khi start
+        node /app/dist/index.js doctor --fix;
+        # Khởi chạy gateway chính thức
+        exec node /app/dist/index.js gateway
     networks:
-      - traefik-net
+      - traefik-network
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.openclaw.rule=Host(`openclaw.${DOMAIN_NAME}`)"
       - "traefik.http.routers.openclaw.entrypoints=websecure"
       - "traefik.http.routers.openclaw.tls.certresolver=letsencrypt"
       - "traefik.http.services.openclaw.loadbalancer.server.port=18789"
-      - "traefik.http.middlewares.openclaw-headers.headers.customrequestheaders.X-Forwarded-For="
-      - "traefik.http.routers.openclaw.middlewares=openclaw-headers"
+      # ĐÃ XÓA middleware làm trống X-Forwarded-For để Gateway nhận diện được IP
 
   openclaw-cli:
-    image: openclaw:local
+    #image: openclaw:local
+    image: openclaw-texlive
     container_name: openclaw-cli
     volumes:
       - ./config:/home/openclaw/.openclaw
@@ -61,14 +65,20 @@ services:
     env_file: .env
     environment:
       - NODE_ENV=production
-    entrypoint: ["node", "/app/dist/index.js"]
+      - OPENCLAW_STATE_DIR=/home/openclaw/.openclaw
+
+    entrypoint: [ "node", "/app/dist/index.js" ]
     networks:
-      - traefik-net
+      - traefik-network
     profiles:
       - cli
     stdin_open: true
     tty: true
 
 networks:
-  traefik-net:
+  traefik-network:
     external: true
+    
+##FIX Permission denied
+#mkdir -p config/agents/main/sessions config/credentials
+#chmod -R 700 config
